@@ -44,14 +44,14 @@ await Promise.all([
     ...stdlib.hasRandom,
     // implement Alice's interact object here
     ...Player('Alice'),
-    wager: 10,
+    wager: stdlib.parseCurrency(10),
   }),
   backend.Bob(ctcBob, {
     ...stdlib.hasRandom,
     // implement Bob's interact object here
     ...Player('Bob'),
     acceptWager: (wager) => {
-      console.log(`Bob accepts the wager ${wager} ${stdlib.standardUnit}`)
+      console.log(`Bob accepts the wager ${fmt(wager)} ${stdlib.standardUnit}`)
     }
   }),
 ]);

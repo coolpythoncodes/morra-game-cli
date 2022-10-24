@@ -1,6 +1,7 @@
 'reach 0.1';
 
 const Player = {
+  ...hasRandom,
   getFingers: Fun([], UInt),
   getGuess: Fun([], UInt),
   seeOutcome: Fun([UInt], Null)
@@ -51,33 +52,54 @@ export const main = Reach.App(() => {
   // The first one to publish deploys the contract
   A.only(() => {
     const wager = declassify(interact.wager)
-    const getAFingers = declassify(interact.getFingers())
-    const getAGuess = declassify(interact.getGuess())
-
   });
-  A.publish(wager, getAFingers, getAGuess)
+  A.publish(wager)
     .pay(wager);
   commit();
-
-  // unknowable(B, A(getAFingers))
 
   // The second one to publish always attaches
   B.only(() => {
     interact.acceptWager(wager);
-    const getBFingers = declassify(interact.getFingers());
-    const getBGuess = declassify(interact.getGuess());
   });
-  B.publish(getBFingers, getBGuess)
-    .pay(wager);
+  B.pay(wager);
 
-  const outcome = winner(getAFingers, getAGuess, getBFingers, getBGuess)
-  assert(outcome == A_WINS || outcome == B_WINS || outcome == DRAW)
+  var outcome = DRAW
+  invariant(balance() == (wager * 2) && isOutcome(outcome))
+  while (outcome == DRAW) {
+    commit()
 
-  const [toA, toB] = outcome == A_WINS ? [2, 0] :
-    outcome == B_WINS ? [0, 2] :
-      [1, 1]
-  transfer(toA * wager).to(A)
-  transfer(toB * wager).to(B)
+    A.only(() => {
+      const getAGuess = declassify(interact.getGuess())
+      const _getAFingers = interact.getFingers()
+      const [_commitA, _saltA] = makeCommitment(interact, _getAFingers)
+      const commitA = declassify(_commitA)
+    });
+    A.publish(commitA, getAGuess);
+    commit()
+
+    unknowable(B, A(_getAFingers, _saltA))
+
+    B.only(() => {
+      const getBFingers = declassify(interact.getFingers());
+      const getBGuess = declassify(interact.getGuess());
+    });
+    B.publish(getBFingers, getBGuess);
+    commit()
+
+    A.only(() => {
+      const saltA = declassify(_saltA)
+      const getAFingers = declassify(_getAFingers)
+    });
+    A.publish(saltA, getAFingers);
+    checkCommitment(commitA, saltA, getAFingers)
+
+    outcome = winner(getAFingers, getAGuess, getBFingers, getBGuess)
+    continue
+  }
+
+  assert(outcome == A_WINS || outcome == B_WINS)
+
+  transfer(wager * 2).to(outcome === A_WINS ? A : B)
   commit()
 
   each([A, B], () => {
