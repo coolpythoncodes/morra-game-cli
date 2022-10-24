@@ -13,16 +13,18 @@ const [isOutcome, A_WINS, B_WINS, DRAW] = makeEnum(3)
 const winner = (getAFingers, getAGuess, getBFingers, getBGuess) => {
   const totalFingers = getAFingers + getBFingers
   if (getAGuess == totalFingers) {
-    return 0
+    return A_WINS
   } else if (getBGuess == totalFingers) {
-    return 1
+    return B_WINS
+  } else if (getAGuess == getBGuess) {
+    return DRAW
   } else {
-    return 2
+    return DRAW
   }
 }
-assert(winner(ZERO, GUESS_ZERO, ZERO, GUESS_FIVE) == A_WINS)
-assert(winner(ZERO, GUESS_FIVE, ZERO, GUESS_ZERO) == B_WINS)
-assert(winner(ZERO, GUESS_FIVE, ZERO, GUESS_ONE) == DRAW)
+assert(winner(ZERO, GUESS_ZERO, ZERO, GUESS_FIVE) == A_WINS, 'Expected an outcome of A_wins')
+assert(winner(ZERO, GUESS_FIVE, ZERO, GUESS_ZERO) == B_WINS, 'Expected an outcome of B_wins')
+assert(winner(ZERO, GUESS_FIVE, ZERO, GUESS_ONE) == DRAW, 'Expected a Draw outcome')
 
 
 assert(isOutcome(winner(ZERO, GUESS_ZERO, ZERO, GUESS_FIVE)))
@@ -51,23 +53,31 @@ export const main = Reach.App(() => {
     const wager = declassify(interact.wager)
     const getAFingers = declassify(interact.getFingers())
     const getAGuess = declassify(interact.getGuess())
+
   });
   A.publish(wager, getAFingers, getAGuess)
     .pay(wager);
   commit();
+
   // unknowable(B, A(getAFingers))
+
   // The second one to publish always attaches
   B.only(() => {
     interact.acceptWager(wager);
     const getBFingers = declassify(interact.getFingers());
     const getBGuess = declassify(interact.getGuess());
   });
-  B.publish(getBFingers, getBGuess);
+  B.publish(getBFingers, getBGuess)
+    .pay(wager);
 
   const outcome = winner(getAFingers, getAGuess, getBFingers, getBGuess)
   assert(outcome == A_WINS || outcome == B_WINS || outcome == DRAW)
 
-  transfer(balance()).to(A)
+  const [toA, toB] = outcome == A_WINS ? [2, 0] :
+    outcome == B_WINS ? [0, 2] :
+      [1, 1]
+  transfer(toA * wager).to(A)
+  transfer(toB * wager).to(B)
   commit()
 
   each([A, B], () => {
