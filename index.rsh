@@ -4,7 +4,8 @@ const Player = {
   ...hasRandom,
   getFingers: Fun([], UInt),
   getGuess: Fun([], UInt),
-  seeOutcome: Fun([UInt], Null)
+  seeOutcome: Fun([UInt], Null),
+  informTimeout: Fun([], Null)
 }
 
 const [isFinger, ZERO, ONE, TWO, THREE, FOUR, FIVE] = makeEnum(6)
@@ -42,6 +43,7 @@ export const main = Reach.App(() => {
     // Specify Alice's interact interface here
     ...Player,
     wager: UInt,
+    deadline: UInt,
   });
   const B = Participant('Bob', {
     // Specify Bob's interact interface here
@@ -49,11 +51,17 @@ export const main = Reach.App(() => {
     acceptWager: Fun([UInt], Null)
   });
   init();
+  const informTimeout = () => {
+    each([A, B], () => {
+      interact.informTimeout()
+    });
+  }
   // The first one to publish deploys the contract
   A.only(() => {
     const wager = declassify(interact.wager)
+    const deadline = declassify(interact.deadline)
   });
-  A.publish(wager)
+  A.publish(wager, deadline)
     .pay(wager);
   commit();
 
@@ -61,7 +69,8 @@ export const main = Reach.App(() => {
   B.only(() => {
     interact.acceptWager(wager);
   });
-  B.pay(wager);
+  B.pay(wager)
+    .timeout(relativeTime(deadline), () => closeTo(A, informTimeout));
 
   var outcome = DRAW
   invariant(balance() == (wager * 2) && isOutcome(outcome))
@@ -74,7 +83,8 @@ export const main = Reach.App(() => {
       const [_commitA, _saltA] = makeCommitment(interact, _getAFingers)
       const commitA = declassify(_commitA)
     });
-    A.publish(commitA, getAGuess);
+    A.publish(commitA, getAGuess)
+      .timeout(relativeTime(deadline), () => closeTo(B, informTimeout));
     commit()
 
     unknowable(B, A(_getAFingers, _saltA))
@@ -83,7 +93,8 @@ export const main = Reach.App(() => {
       const getBFingers = declassify(interact.getFingers());
       const getBGuess = declassify(interact.getGuess());
     });
-    B.publish(getBFingers, getBGuess);
+    B.publish(getBFingers, getBGuess)
+      .timeout(relativeTime(deadline), () => closeTo(A, informTimeout));
     commit()
 
     A.only(() => {
