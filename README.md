@@ -44,8 +44,7 @@ git clone <this-repo>
 #Download Reach in root directory (<this-repo>)
 curl https://docs.reach.sh/reach -o reach ; chmod +x reach
 
-#Update Reach and Compile Reach code
-./reach update
+#Compile Reach code
 ./reach compile
 
 #run
